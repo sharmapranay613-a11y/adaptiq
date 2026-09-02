@@ -1,26 +1,40 @@
 import express from 'express';
 import path from 'path';
+import cors from 'cors';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
+
 import {
   generateQuestions,
   analyzeMistake,
   explainTopic,
   tutor,
 } from './server/aiService.ts';
+
 import type { TestResultItem } from './src/types/adaptiq.ts';
 
-// Load environment variables if present
+// Load environment variables
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const PORT = 3001;
+
+// Allow frontend (localhost:3000) to communicate with backend (localhost:3001)
+app.use(
+  cors({
+    origin: 'http://localhost:3000',
+  })
+);
 
 app.use(express.json());
 
-// API Health Check
+// ===============================
+// API HEALTH CHECK
+// ===============================
+
 app.get('/api/ai/health', (req, res) => {
   const hasKey = Boolean(process.env.GEMINI_API_KEY);
+
   res.json({
     status: 'ok',
     service: 'AdaptiQ AI Layer',
@@ -29,15 +43,26 @@ app.get('/api/ai/health', (req, res) => {
   });
 });
 
-// 1. generateQuestions endpoint
+// ===============================
+// 1. GENERATE QUESTIONS
+// ===============================
+
 app.post('/api/ai/generate-questions', async (req, res) => {
   const startTime = Date.now();
+
   try {
-    const { subject, topic, difficulty = 'intermediate', count = 3 } = req.body;
+    const {
+      subject,
+      topic,
+      difficulty = 'intermediate',
+      count = 3,
+    } = req.body;
+
     if (!subject || !topic) {
       return res.status(400).json({
         success: false,
-        error: 'Missing required parameters: "subject" and "topic" are required.',
+        error:
+          'Missing required parameters: "subject" and "topic" are required.',
       });
     }
 
@@ -54,21 +79,41 @@ app.post('/api/ai/generate-questions', async (req, res) => {
       latencyMs: Date.now() - startTime,
     });
   } catch (error: any) {
-    console.error('Error in /api/ai/generate-questions:', error);
+    console.error(
+      'Error in /api/ai/generate-questions:',
+      error
+    );
+
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to generate questions',
+      error:
+        error.message || 'Failed to generate questions',
       latencyMs: Date.now() - startTime,
     });
   }
 });
 
-// 2. analyzeMistake endpoint
+// ===============================
+// 2. ANALYZE MISTAKE
+// ===============================
+
 app.post('/api/ai/analyze-mistake', async (req, res) => {
   const startTime = Date.now();
+
   try {
-    const { question, studentAnswer, correctAnswer, topic } = req.body;
-    if (!question || !studentAnswer || !correctAnswer || !topic) {
+    const {
+      question,
+      studentAnswer,
+      correctAnswer,
+      topic,
+    } = req.body;
+
+    if (
+      !question ||
+      !studentAnswer ||
+      !correctAnswer ||
+      !topic
+    ) {
       return res.status(400).json({
         success: false,
         error:
@@ -89,24 +134,38 @@ app.post('/api/ai/analyze-mistake', async (req, res) => {
       latencyMs: Date.now() - startTime,
     });
   } catch (error: any) {
-    console.error('Error in /api/ai/analyze-mistake:', error);
+    console.error(
+      'Error in /api/ai/analyze-mistake:',
+      error
+    );
+
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to analyze mistake',
+      error:
+        error.message || 'Failed to analyze mistake',
       latencyMs: Date.now() - startTime,
     });
   }
 });
 
-// 3. explainTopic endpoint
+// ===============================
+// 3. EXPLAIN TOPIC
+// ===============================
+
 app.post('/api/ai/explain-topic', async (req, res) => {
   const startTime = Date.now();
+
   try {
-    const { topic, studentLevel = 'intermediate' } = req.body;
+    const {
+      topic,
+      studentLevel = 'intermediate',
+    } = req.body;
+
     if (!topic) {
       return res.status(400).json({
         success: false,
-        error: 'Missing required parameter: "topic" is required.',
+        error:
+          'Missing required parameter: "topic" is required.',
       });
     }
 
@@ -121,24 +180,38 @@ app.post('/api/ai/explain-topic', async (req, res) => {
       latencyMs: Date.now() - startTime,
     });
   } catch (error: any) {
-    console.error('Error in /api/ai/explain-topic:', error);
+    console.error(
+      'Error in /api/ai/explain-topic:',
+      error
+    );
+
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to explain topic',
+      error:
+        error.message || 'Failed to explain topic',
       latencyMs: Date.now() - startTime,
     });
   }
 });
 
-// 4. tutor endpoint
+// ===============================
+// 4. AI TUTOR
+// ===============================
+
 app.post('/api/ai/tutor', async (req, res) => {
   const startTime = Date.now();
+
   try {
-    const { question, context = '' } = req.body;
+    const {
+      question,
+      context = '',
+    } = req.body;
+
     if (!question) {
       return res.status(400).json({
         success: false,
-        error: 'Missing required parameter: "question" is required.',
+        error:
+          'Missing required parameter: "question" is required.',
       });
     }
 
@@ -153,161 +226,306 @@ app.post('/api/ai/tutor', async (req, res) => {
       latencyMs: Date.now() - startTime,
     });
   } catch (error: any) {
-    console.error('Error in /api/ai/tutor:', error);
+    console.error(
+      'Error in /api/ai/tutor:',
+      error
+    );
+
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to run tutor logic',
+      error:
+        error.message || 'Failed to run tutor logic',
       latencyMs: Date.now() - startTime,
     });
   }
 });
 
-// Automated Test Runner for Java/Inheritance examples
+// ===============================
+// 5. AUTOMATED AI TESTS
+// ===============================
+
 app.post('/api/ai/run-tests', async (req, res) => {
   const results: TestResultItem[] = [];
 
-  // Test 1: generateQuestions with Java / Inheritance
+  // -------------------------------
+  // TEST 1: Generate Questions
+  // -------------------------------
+
   const t1Start = Date.now();
+
   try {
     const input1 = {
       subject: 'Computer Science',
-      topic: 'Java Inheritance (method overriding & super keyword)',
+      topic:
+        'Java Inheritance (method overriding & super keyword)',
       difficulty: 'intermediate',
       count: 2,
     };
+
     const output1 = await generateQuestions(input1);
+
     results.push({
       functionName: 'generateQuestions',
-      title: 'Java Inheritance: Method Overriding & Super',
+      title:
+        'Java Inheritance: Method Overriding & Super',
+
       status:
-        output1.questions && output1.questions.length >= 2 ? 'passed' : 'failed',
+        output1.questions &&
+        output1.questions.length >= 2
+          ? 'passed'
+          : 'failed',
+
       latencyMs: Date.now() - t1Start,
+
       input: input1,
-      output: output1 as unknown as Record<string, unknown>,
+
+      output:
+        output1 as unknown as Record<string, unknown>,
     });
   } catch (err: any) {
     results.push({
       functionName: 'generateQuestions',
-      title: 'Java Inheritance: Method Overriding & Super',
+      title:
+        'Java Inheritance: Method Overriding & Super',
+
       status: 'failed',
+
       latencyMs: Date.now() - t1Start,
-      input: { topic: 'Java Inheritance' },
+
+      input: {
+        topic: 'Java Inheritance',
+      },
+
       error: err.message,
     });
   }
 
-  // Test 2: analyzeMistake with Java / Inheritance
+  // -------------------------------
+  // TEST 2: Analyze Mistake
+  // -------------------------------
+
   const t2Start = Date.now();
+
   try {
     const input2 = {
       question:
         'In Java, if a subclass defines a method with the same name and parameters as in its superclass, what is this called?',
+
       studentAnswer: 'Method Overloading',
+
       correctAnswer: 'Method Overriding',
-      topic: 'Java Inheritance Polymorphism',
+
+      topic:
+        'Java Inheritance Polymorphism',
     };
-    const output2 = await analyzeMistake(input2);
+
+    const output2 =
+      await analyzeMistake(input2);
+
     results.push({
       functionName: 'analyzeMistake',
-      title: 'Java Inheritance: Overriding vs Overloading Misconception',
-      status: output2.mistakeType ? 'passed' : 'failed',
+
+      title:
+        'Java Inheritance: Overriding vs Overloading Misconception',
+
+      status:
+        output2.mistakeType
+          ? 'passed'
+          : 'failed',
+
       latencyMs: Date.now() - t2Start,
+
       input: input2,
-      output: output2 as unknown as Record<string, unknown>,
+
+      output:
+        output2 as unknown as Record<string, unknown>,
     });
   } catch (err: any) {
     results.push({
       functionName: 'analyzeMistake',
-      title: 'Java Inheritance: Overriding vs Overloading Misconception',
+
+      title:
+        'Java Inheritance: Overriding vs Overloading Misconception',
+
       status: 'failed',
+
       latencyMs: Date.now() - t2Start,
-      input: { topic: 'Java Inheritance' },
+
+      input: {
+        topic: 'Java Inheritance',
+      },
+
       error: err.message,
     });
   }
 
-  // Test 3: explainTopic with Java / Inheritance
+  // -------------------------------
+  // TEST 3: Explain Topic
+  // -------------------------------
+
   const t3Start = Date.now();
+
   try {
     const input3 = {
-      topic: 'Java Inheritance and the "super" keyword in constructors',
+      topic:
+        'Java Inheritance and the "super" keyword in constructors',
+
       studentLevel: 'beginner',
     };
-    const output3 = await explainTopic(input3);
+
+    const output3 =
+      await explainTopic(input3);
+
     results.push({
       functionName: 'explainTopic',
-      title: 'Java Inheritance: "super" keyword for Beginners',
+
+      title:
+        'Java Inheritance: "super" keyword for Beginners',
+
       status:
-        output3.simpleExplanation && output3.practiceQuestion ? 'passed' : 'failed',
+        output3.simpleExplanation &&
+        output3.practiceQuestion
+          ? 'passed'
+          : 'failed',
+
       latencyMs: Date.now() - t3Start,
+
       input: input3,
-      output: output3 as unknown as Record<string, unknown>,
+
+      output:
+        output3 as unknown as Record<string, unknown>,
     });
   } catch (err: any) {
     results.push({
       functionName: 'explainTopic',
-      title: 'Java Inheritance: "super" keyword for Beginners',
+
+      title:
+        'Java Inheritance: "super" keyword for Beginners',
+
       status: 'failed',
+
       latencyMs: Date.now() - t3Start,
-      input: { topic: 'Java Inheritance' },
+
+      input: {
+        topic: 'Java Inheritance',
+      },
+
       error: err.message,
     });
   }
 
-  // Test 4: tutor with Java / Inheritance
+  // -------------------------------
+  // TEST 4: AI Tutor
+  // -------------------------------
+
   const t4Start = Date.now();
+
   try {
     const input4 = {
       question:
         'Why does my Java code give a compiler error: "Constructor Dog() cannot be applied to given types"? Animal has Animal(String name).',
-      context: 'Student is learning inheritance and creating a subclass Dog extending Animal.',
+
+      context:
+        'Student is learning inheritance and creating a subclass Dog extending Animal.',
     };
-    const output4 = await tutor(input4);
+
+    const output4 =
+      await tutor(input4);
+
     results.push({
       functionName: 'tutor',
-      title: 'Java Inheritance: Socratic Tutor for Super Constructor Error',
-      status: output4.hint && output4.simpleExplanation ? 'passed' : 'failed',
+
+      title:
+        'Java Inheritance: Socratic Tutor for Super Constructor Error',
+
+      status:
+        output4.hint &&
+        output4.simpleExplanation
+          ? 'passed'
+          : 'failed',
+
       latencyMs: Date.now() - t4Start,
+
       input: input4,
-      output: output4 as unknown as Record<string, unknown>,
+
+      output:
+        output4 as unknown as Record<string, unknown>,
     });
   } catch (err: any) {
     results.push({
       functionName: 'tutor',
-      title: 'Java Inheritance: Socratic Tutor for Super Constructor Error',
+
+      title:
+        'Java Inheritance: Socratic Tutor for Super Constructor Error',
+
       status: 'failed',
+
       latencyMs: Date.now() - t4Start,
-      input: { topic: 'Java Inheritance' },
+
+      input: {
+        topic: 'Java Inheritance',
+      },
+
       error: err.message,
     });
   }
 
   res.json({
-    success: results.every((r) => r.status === 'passed'),
-    allPassed: results.every((r) => r.status === 'passed'),
+    success: results.every(
+      (r) => r.status === 'passed'
+    ),
+
+    allPassed: results.every(
+      (r) => r.status === 'passed'
+    ),
+
     results,
   });
 });
 
+// ===============================
+// START SERVER
+// ===============================
+
 async function startServer() {
-  // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+      },
       appType: 'spa',
     });
+
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    const distPath = path.join(
+      process.cwd(),
+      'dist'
+    );
+
+    app.use(
+      express.static(distPath)
+    );
+
     app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      res.sendFile(
+        path.join(
+          distPath,
+          'index.html'
+        )
+      );
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[AdaptiQ AI Server] Running on http://0.0.0.0:${PORT}`);
-  });
+  app.listen(
+    PORT,
+    '0.0.0.0',
+    () => {
+      console.log(
+        `[AdaptiQ AI Server] Running on http://0.0.0.0:${PORT}`
+      );
+    }
+  );
 }
 
 startServer();
