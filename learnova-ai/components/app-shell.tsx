@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   LayoutDashboard,
   ClipboardCheck,
@@ -16,7 +16,7 @@ import {
   CalendarDays,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { student, examCountdownDays } from '@/lib/mock-data'
+import { supabase } from '@/lib/supabase'
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -31,6 +31,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
 
+  const [userName, setUserName] = useState('Student')
+  const [userEmail, setUserEmail] = useState('')
+
+  useEffect(() => {
+    async function loadUser() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (user) {
+        setUserName(
+          user.user_metadata?.full_name ||
+            user.email?.split('@')[0] ||
+            'Student'
+        )
+
+        setUserEmail(user.email || '')
+      }
+    }
+
+    loadUser()
+  }, [])
+
   const isActive = (href: string) =>
     href === '/' ? pathname === '/' : pathname.startsWith(href)
 
@@ -39,6 +62,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {navItems.map((item) => {
         const active = isActive(item.href)
         const Icon = item.icon
+
         return (
           <Link
             key={item.href}
@@ -54,9 +78,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Icon
               className={cn(
                 'size-[18px] shrink-0 transition-colors',
-                active ? 'text-violet' : 'text-muted-foreground group-hover:text-foreground',
+                active
+                  ? 'text-violet'
+                  : 'text-muted-foreground group-hover:text-foreground',
               )}
             />
+
             {item.label}
           </Link>
         )
@@ -65,14 +92,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   )
 
   const Brand = () => (
-    <Link href="/" className="flex items-center gap-2.5" onClick={() => setOpen(false)}>
+    <Link
+      href="/"
+      className="flex items-center gap-2.5"
+      onClick={() => setOpen(false)}
+    >
       <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet via-blue to-cyan text-primary-foreground shadow-lg shadow-violet/30">
         <GraduationCap className="size-5" />
       </span>
+
       <span className="flex flex-col leading-none">
         <span className="text-[15px] font-semibold tracking-tight text-foreground">
           LEARNOVA <span className="text-violet">AI</span>
         </span>
+
         <span className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
           Your Learning. Your Pace.
         </span>
@@ -87,10 +120,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="px-2 pt-2">
           <Brand />
         </div>
+
         <div className="px-1">
           <NavList />
         </div>
-        <StudentCard className="mt-auto" />
+
+        <StudentCard
+          className="mt-auto"
+          userName={userName}
+          userEmail={userEmail}
+        />
       </aside>
 
       {/* Mobile drawer */}
@@ -100,9 +139,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             className="absolute inset-0 bg-background/70 backdrop-blur-sm"
             onClick={() => setOpen(false)}
           />
+
           <aside className="glass-strong absolute left-0 top-0 flex h-full w-72 flex-col gap-6 border-r p-4">
             <div className="flex items-center justify-between px-1 pt-1">
               <Brand />
+
               <button
                 aria-label="Close menu"
                 onClick={() => setOpen(false)}
@@ -111,8 +152,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <X className="size-5" />
               </button>
             </div>
+
             <NavList />
-            <StudentCard className="mt-auto" />
+
+            <StudentCard
+              className="mt-auto"
+              userName={userName}
+              userEmail={userEmail}
+            />
           </aside>
         </div>
       )}
@@ -128,13 +175,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               <Menu className="size-5" />
             </button>
+
             <div className="lg:hidden">
               <Brand />
             </div>
           </div>
+
           <div className="flex items-center gap-2 rounded-full border border-warning/30 bg-warning/10 px-3 py-1.5 text-xs font-medium text-warning">
             <CalendarDays className="size-3.5" />
-            Exam in {examCountdownDays} days
+            Exam in 15 days
           </div>
         </header>
 
@@ -146,7 +195,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   )
 }
 
-function StudentCard({ className }: { className?: string }) {
+function StudentCard({
+  className,
+  userName,
+  userEmail,
+}: {
+  className?: string
+  userName: string
+  userEmail: string
+}) {
+  const initials = userName
+    .split(' ')
+    .map((name) => name[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+
   return (
     <div
       className={cn(
@@ -155,11 +219,17 @@ function StudentCard({ className }: { className?: string }) {
       )}
     >
       <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet to-blue text-sm font-semibold text-primary-foreground">
-        {student.initials}
+        {initials || 'ST'}
       </span>
+
       <div className="min-w-0">
-        <p className="truncate text-sm font-semibold text-foreground">{student.name}</p>
-        <p className="truncate text-xs text-muted-foreground">{student.program}</p>
+        <p className="truncate text-sm font-semibold text-foreground">
+          {userName}
+        </p>
+
+        <p className="truncate text-xs text-muted-foreground">
+          {userEmail}
+        </p>
       </div>
     </div>
   )
